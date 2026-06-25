@@ -255,48 +255,7 @@
 <!-- ══════════════════════════════════════════
      SETUP SCREEN — shown until credentials saved
      ══════════════════════════════════════════ -->
-<div id="setupScreen">
-  <div class="setup-card">
-    <h1>⚙️ Connect to Supabase</h1>
-    <p class="setup-sub">This only needs to be done once. After saving, this screen won't appear again.</p>
-
-    <div class="setup-steps">
-      <div class="setup-step">
-        Go to <a href="https://supabase.com" target="_blank">supabase.com</a> and create a free account, then click <strong>New project</strong>.
-      </div>
-      <div class="setup-step">
-        In your project, go to <strong>SQL Editor</strong> and run this query to create the table:<br><br>
-        <code style="display:block;padding:8px;margin-top:6px;font-size:11px;line-height:1.7;white-space:pre-wrap;background:#f4f1ec;border-radius:6px;border:1px solid #e0dbd2">CREATE TABLE bookings (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  week_key text NOT NULL,
-  cell_id text NOT NULL,
-  teacher text NOT NULL,
-  section text,
-  color text DEFAULT 'blue',
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(week_key, cell_id)
-);</code>
-      </div>
-      <div class="setup-step">
-        Go to <strong>Project Settings → API</strong>. Copy your <strong>Project URL</strong> and <strong>anon / public key</strong> and paste them below.
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Supabase Project URL</label>
-      <input id="cfgUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" />
-      <div class="hint">Looks like: https://abcdefghijkl.supabase.co</div>
-    </div>
-    <div class="field">
-      <label>Supabase Anon Key</label>
-      <input id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
-      <div class="hint">Long string starting with "eyJ…" — use the anon/public key, not the service key.</div>
-    </div>
-    <div class="setup-err" id="setupErr"></div>
-    <br>
-    <button class="btn accent" onclick="saveConfig()" id="connectBtn">Connect &amp; Open Scheduler →</button>
-  </div>
-</div>
+<div id="setupScreen" style="display:none"><div id="setupErr"></div><input id="cfgUrl"/><input id="cfgKey"/></div>
 
 <!-- ══════════════════════════════════════════
      MAIN APP
@@ -738,7 +697,7 @@ document.addEventListener('keydown', e => {
 
 // ── Boot ───────────────────────────────────────────────
 (function boot() {
-  const HARDCODED_URL = 'https://mstgsumlpzosfikpxbrp.supabase.co/rest/v1/';
+  const HARDCODED_URL = 'https://mstgsumlpzosfikpxbrp.supabase.co';
   const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zdGdzdW1scHpvc2Zpa3B4YnJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNTIzMDAsImV4cCI6MjA5NzkyODMwMH0.-gwf0Q33rC6wmNEHBMwOeBiEINw4raYn2z2vVkayemM';
   document.getElementById('setupScreen').style.display = 'none';
   initApp({ url: HARDCODED_URL, key: HARDCODED_KEY });
