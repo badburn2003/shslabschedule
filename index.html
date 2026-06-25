@@ -6,6 +6,7 @@
 <title>Computer Lab Scheduler</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg: #f4f1ec;
@@ -21,368 +22,338 @@
     --radius: 8px;
     --radius-lg: 12px;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
+  /* ── Setup screen ── */
+  #setupScreen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem;
   }
-
-  /* ── Header ── */
-  .app-header {
-    background: var(--accent);
-    color: #fff;
-    padding: 1rem 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
+  .setup-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 2rem;
+    width: 480px; max-width: 100%;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
   }
-  .app-header h1 {
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: -0.3px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .setup-card h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .setup-card .setup-sub { font-size: 13px; color: var(--text2); margin-bottom: 1.5rem; }
+  .setup-steps { counter-reset: step; margin-bottom: 1.5rem; }
+  .setup-step {
+    counter-increment: step;
+    display: flex; gap: 12px; align-items: flex-start;
+    margin-bottom: 1rem; font-size: 13px; color: var(--text2); line-height: 1.5;
   }
-  .app-header .sub {
-    font-size: 12px;
-    opacity: 0.7;
-    font-family: 'DM Mono', monospace;
+  .setup-step::before {
+    content: counter(step);
+    min-width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
   }
-
-  /* ── Controls bar ── */
-  .controls {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0.75rem 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
+  .setup-step a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .setup-step a:hover { text-decoration: underline; }
+  .setup-step code {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 5px; color: var(--text);
   }
-  .controls label {
-    font-size: 12px;
-    color: var(--text2);
-    margin-right: -4px;
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--text2); font-weight: 500; margin-bottom: 5px; }
+  .field input {
+    font-family: 'DM Sans', sans-serif; width: 100%; font-size: 13px;
+    padding: 8px 10px; border: 1px solid var(--border2);
+    border-radius: var(--radius); background: var(--surface); color: var(--text);
   }
-  .controls input, .controls select {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    padding: 6px 10px;
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text);
-    height: 34px;
-  }
-  .controls input { min-width: 150px; }
-  .controls input:focus, .controls select:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-    border-color: transparent;
-  }
+  .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .field .hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
   .btn {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    padding: 6px 14px;
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    height: 34px;
-    white-space: nowrap;
-    transition: background 0.15s, border-color 0.15s;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    padding: 8px 18px; border: 1px solid var(--border2);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); cursor: pointer; height: 36px; white-space: nowrap;
+    transition: background 0.15s;
   }
-  .btn:hover { background: var(--surface2); border-color: var(--border2); }
+  .btn:hover { background: var(--surface2); }
   .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
   .btn.accent:hover { background: #133d72; }
-  .btn.danger { background: #fff; color: #a32d2d; border-color: #e2a0a0; }
+  .btn.danger { color: #a32d2d; border-color: #e2a0a0; }
   .btn.danger:hover { background: #fff0f0; }
-  .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .setup-err { font-size: 12px; color: #a32d2d; margin-top: 8px; display: none; }
 
-  /* ── Week nav ── */
+  /* ── App ── */
+  #appScreen { display: none; }
+  .app-header {
+    background: var(--accent); color: #fff;
+    padding: 0.875rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .app-header h1 { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .app-header .hright { display: flex; align-items: center; gap: 8px; }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #4ade80; display: inline-block; margin-right: 4px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .live-label { font-size: 12px; opacity: 0.85; }
+  .header-btn {
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    padding: 5px 12px; border: 1px solid rgba(255,255,255,0.35);
+    border-radius: var(--radius); background: transparent; color: #fff;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.12); }
+
+  .controls {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0.65rem 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+  }
+  .controls label { font-size: 12px; color: var(--text2); }
+  .controls input, .controls select {
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    padding: 6px 10px; border: 1px solid var(--border2);
+    border-radius: var(--radius); background: var(--surface); color: var(--text); height: 34px;
+  }
+  .controls input { min-width: 150px; }
+  .controls input:focus, .controls select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .sep { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
+
   .week-nav {
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    padding: 0.5rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+    padding: 0.45rem 1.5rem; display: flex; align-items: center; gap: 0.5rem;
   }
-  .week-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text);
-    min-width: 200px;
-    text-align: center;
-  }
+  .week-label { font-size: 14px; font-weight: 600; min-width: 220px; text-align: center; }
 
-  /* ── Legend ── */
   .legend-bar {
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    padding: 0.4rem 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    min-height: 36px;
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+    padding: 0.4rem 1.5rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 34px;
   }
   .legend-bar .lbl { font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-  .legend-item {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 12px; color: var(--text2);
-  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); }
   .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
-  /* ── Schedule grid ── */
-  .grid-container {
-    padding: 1rem 1.5rem 2rem;
-    overflow-x: auto;
-  }
+  .grid-container { padding: 1rem 1.5rem 3rem; overflow-x: auto; }
   table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    min-width: 680px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    min-width: 680px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden;
   }
-  thead tr {
-    background: var(--accent);
-    color: #fff;
-  }
+  thead tr { background: var(--accent); color: #fff; }
   th {
-    font-size: 12px;
-    font-weight: 600;
-    padding: 10px 8px;
-    text-align: center;
-    letter-spacing: 0.2px;
+    font-size: 12px; font-weight: 600; padding: 10px 8px; text-align: center;
     border-right: 1px solid rgba(255,255,255,0.12);
   }
   th:last-child { border-right: none; }
-  th.time-th { width: 82px; text-align: left; padding-left: 12px; }
-  th.day-th { min-width: 100px; }
+  th.time-th { width: 90px; text-align: left; padding-left: 12px; }
   th .date-sub { font-size: 10px; font-weight: 400; opacity: 0.7; display: block; margin-top: 2px; }
-
   td {
-    font-size: 12px;
-    padding: 3px;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-    height: 48px;
+    font-size: 12px; padding: 3px;
+    border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    vertical-align: top; height: 48px;
   }
   td:last-child { border-right: none; }
   tr:last-child td { border-bottom: none; }
-
   td.time-td {
-    background: var(--surface2);
-    color: var(--text3);
-    font-size: 11px;
-    font-family: 'DM Mono', monospace;
-    text-align: right;
-    padding: 0 8px 0 4px;
-    vertical-align: middle;
-    cursor: default;
-    border-right: 2px solid var(--border2);
-    white-space: nowrap;
+    background: var(--surface2); color: var(--text3);
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    text-align: right; padding: 0 8px 0 4px;
+    vertical-align: middle; cursor: default;
+    border-right: 2px solid var(--border2); white-space: nowrap;
   }
-  td.empty-td {
-    cursor: pointer;
-    transition: background 0.12s;
-  }
-  td.empty-td:hover {
-    background: var(--accent-light);
-  }
-  td.empty-td:hover::after {
-    content: '+';
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    color: var(--accent);
-    font-size: 18px;
-    font-weight: 300;
-    opacity: 0.5;
-  }
-
+  td.empty-td { cursor: pointer; transition: background 0.1s; }
+  td.empty-td:hover { background: var(--accent-light); }
   .slot {
-    border-radius: 5px;
-    padding: 4px 6px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    transition: filter 0.12s;
+    border-radius: 5px; padding: 4px 6px; height: 100%;
+    display: flex; flex-direction: column; justify-content: center;
+    cursor: pointer; position: relative; overflow: hidden; transition: filter 0.12s;
   }
   .slot:hover { filter: brightness(0.94); }
   .slot .s-teacher { font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .slot .s-section { font-size: 10px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .slot .s-del {
     position: absolute; top: 2px; right: 3px;
-    font-size: 11px; font-weight: 700; opacity: 0;
-    cursor: pointer; line-height: 1;
-    transition: opacity 0.12s;
+    font-size: 11px; font-weight: 700; opacity: 0; cursor: pointer; transition: opacity 0.12s;
   }
   .slot:hover .s-del { opacity: 0.7; }
-  .slot .s-del:hover { opacity: 1 !important; }
 
   /* ── Modal ── */
   .modal-overlay {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(20,16,10,0.45);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
+    display: none; position: fixed; inset: 0;
+    background: rgba(20,16,10,0.45); z-index: 200;
+    align-items: center; justify-content: center; padding: 1rem;
   }
   .modal-overlay.open { display: flex; }
   .modal {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    padding: 1.5rem;
-    width: 340px;
-    max-width: 100%;
+    background: var(--surface); border-radius: var(--radius-lg);
+    border: 1px solid var(--border); padding: 1.5rem;
+    width: 340px; max-width: 100%;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     animation: slideUp 0.18s ease;
   }
-  @keyframes slideUp {
-    from { transform: translateY(12px); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
-  .modal h2 {
-    font-size: 15px; font-weight: 600; margin-bottom: 4px;
-  }
+  @keyframes slideUp { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
   .modal .slot-info {
-    font-size: 12px; color: var(--text2);
-    margin-bottom: 1.25rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--text2); margin-bottom: 1.25rem;
+    padding-bottom: 1rem; border-bottom: 1px solid var(--border);
   }
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
-  .field input, .field select {
-    font-family: 'DM Sans', sans-serif;
-    width: 100%; font-size: 13px;
-    padding: 8px 10px;
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text);
+  .modal .field { margin-bottom: 14px; }
+  .modal .field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
+  .modal .field input {
+    font-family: 'DM Sans', sans-serif; width: 100%; font-size: 13px;
+    padding: 8px 10px; border: 1px solid var(--border2);
+    border-radius: var(--radius); background: var(--surface); color: var(--text);
   }
-  .field input:focus, .field select:focus {
-    outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent;
-  }
-  .color-grid {
-    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 4px;
-  }
+  .modal .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .color-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 4px; }
   .color-opt {
-    height: 28px; border-radius: 5px; border: 2px solid transparent;
+    height: 26px; border-radius: 5px; border: 2px solid transparent;
     cursor: pointer; transition: transform 0.1s, border-color 0.1s;
   }
-  .color-opt:hover { transform: scale(1.08); }
+  .color-opt:hover { transform: scale(1.1); }
   .color-opt.selected { border-color: var(--text); }
   .modal-actions {
-    display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem;
-    padding-top: 1rem; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+    margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  }
+
+  /* ── Loading overlay ── */
+  #loadingBar {
+    position: fixed; top: 0; left: 0; right: 0; height: 3px;
+    background: #4ade80; z-index: 999;
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.3s; display: none;
   }
 
   /* ── Toast ── */
   #toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
-    background: #1a1714; color: #fff; font-size: 13px; padding: 8px 20px;
-    border-radius: 99px; z-index: 999; opacity: 0;
-    transition: transform 0.2s, opacity 0.2s;
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: #1a1714; color: #fff; font-size: 13px;
+    padding: 8px 20px; border-radius: 99px; z-index: 999;
+    opacity: 0; transition: transform 0.2s, opacity 0.2s;
     pointer-events: none; white-space: nowrap;
   }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
-  /* ── Print styles ── */
   @media print {
-    .controls, .week-nav .btn, #toast, .modal-overlay { display: none !important; }
+    .controls, .week-nav .btn, #toast, .modal-overlay, .app-header .hright { display: none !important; }
     body { background: white; }
     .grid-container { padding: 0; }
-    table { box-shadow: none; }
     .slot .s-del { display: none; }
   }
-
   @media (max-width: 600px) {
-    .app-header { padding: 0.75rem 1rem; }
-    .controls { padding: 0.5rem 1rem; }
-    .grid-container { padding: 0.75rem 0.5rem 2rem; }
-    .week-nav { padding: 0.5rem 0.75rem; }
+    .app-header, .controls, .week-nav, .legend-bar { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .grid-container { padding: 0.75rem 0.5rem 3rem; }
   }
 </style>
 </head>
 <body>
 
-<header class="app-header">
-  <div>
+<!-- ══════════════════════════════════════════
+     SETUP SCREEN — shown until credentials saved
+     ══════════════════════════════════════════ -->
+<div id="setupScreen">
+  <div class="setup-card">
+    <h1>⚙️ Connect to Supabase</h1>
+    <p class="setup-sub">This only needs to be done once. After saving, this screen won't appear again.</p>
+
+    <div class="setup-steps">
+      <div class="setup-step">
+        Go to <a href="https://supabase.com" target="_blank">supabase.com</a> and create a free account, then click <strong>New project</strong>.
+      </div>
+      <div class="setup-step">
+        In your project, go to <strong>SQL Editor</strong> and run this query to create the table:<br><br>
+        <code style="display:block;padding:8px;margin-top:6px;font-size:11px;line-height:1.7;white-space:pre-wrap;background:#f4f1ec;border-radius:6px;border:1px solid #e0dbd2">CREATE TABLE bookings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  week_key text NOT NULL,
+  cell_id text NOT NULL,
+  teacher text NOT NULL,
+  section text,
+  color text DEFAULT 'blue',
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(week_key, cell_id)
+);</code>
+      </div>
+      <div class="setup-step">
+        Go to <strong>Project Settings → API</strong>. Copy your <strong>Project URL</strong> and <strong>anon / public key</strong> and paste them below.
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Supabase Project URL</label>
+      <input id="cfgUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+      <div class="hint">Looks like: https://abcdefghijkl.supabase.co</div>
+    </div>
+    <div class="field">
+      <label>Supabase Anon Key</label>
+      <input id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+      <div class="hint">Long string starting with "eyJ…" — use the anon/public key, not the service key.</div>
+    </div>
+    <div class="setup-err" id="setupErr"></div>
+    <br>
+    <button class="btn accent" onclick="saveConfig()" id="connectBtn">Connect &amp; Open Scheduler →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN APP
+     ══════════════════════════════════════════ -->
+<div id="appScreen">
+  <div id="loadingBar"></div>
+
+  <header class="app-header">
     <h1>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-      </svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
       Computer Lab Scheduler
     </h1>
-    <div class="sub">Book your time slot for the week</div>
+    <div class="hright">
+      <span class="live-label"><span class="live-dot"></span>Live</span>
+      <button class="header-btn" onclick="window.print()">🖨 Print</button>
+      <button class="header-btn" onclick="resetConfig()">⚙ Settings</button>
+    </div>
+  </header>
+
+  <div class="controls">
+    <label>Your name:</label>
+    <input id="teacherName" placeholder="e.g. Ms. Santos" autocomplete="name" />
+    <label>Section / Subject:</label>
+    <input id="sectionName" placeholder="e.g. Grade 9-Rizal / TLE" />
+    <label>Color:</label>
+    <select id="colorPick">
+      <option value="blue">Blue</option>
+      <option value="teal">Teal</option>
+      <option value="purple">Purple</option>
+      <option value="amber">Amber</option>
+      <option value="coral">Coral</option>
+      <option value="green">Green</option>
+      <option value="rose">Rose</option>
+      <option value="slate">Slate</option>
+    </select>
+    <div class="sep"></div>
+    <button class="btn danger" onclick="clearMySlots()">✕ Clear my slots</button>
   </div>
-  <button class="btn accent" onclick="window.print()">🖨 Print schedule</button>
-</header>
 
-<div class="controls">
-  <label>Your name:</label>
-  <input id="teacherName" placeholder="e.g. Ms. Santos" autocomplete="name" />
-  <label>Section / Subject:</label>
-  <input id="sectionName" placeholder="e.g. Grade 9-Rizal / TLE" />
-  <label>Color:</label>
-  <select id="colorPick">
-    <option value="blue">Blue</option>
-    <option value="teal">Teal</option>
-    <option value="purple">Purple</option>
-    <option value="amber">Amber</option>
-    <option value="coral">Coral</option>
-    <option value="green">Green</option>
-    <option value="rose">Rose</option>
-    <option value="slate">Slate</option>
-  </select>
-  <div class="sep"></div>
-  <button class="btn danger" onclick="clearMySlots()">✕ Clear my slots</button>
-</div>
+  <div class="week-nav">
+    <button class="btn" onclick="changeWeek(-1)">← Prev</button>
+    <span class="week-label" id="weekLabel"></span>
+    <button class="btn" onclick="changeWeek(1)">Next →</button>
+    <button class="btn" onclick="goToday()">This week</button>
+  </div>
 
-<div class="week-nav">
-  <button class="btn" onclick="changeWeek(-1)">&#8592; Prev</button>
-  <span class="week-label" id="weekLabel"></span>
-  <button class="btn" onclick="changeWeek(1)">Next &#8594;</button>
-  <button class="btn" onclick="goToday()">This week</button>
-</div>
+  <div class="legend-bar">
+    <span class="lbl">Teachers:</span>
+    <div id="legend" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;"></div>
+  </div>
 
-<div class="legend-bar">
-  <span class="lbl">Teachers:</span>
-  <div id="legend" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;"></div>
-</div>
-
-<div class="grid-container">
-  <table id="schedTable" role="grid" aria-label="Computer lab schedule">
-    <thead id="tableHead"></thead>
-    <tbody id="tableBody"></tbody>
-  </table>
+  <div class="grid-container">
+    <table id="schedTable" role="grid" aria-label="Computer lab schedule">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Modal -->
@@ -404,7 +375,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn accent" onclick="saveSlot()">Book slot</button>
+      <button class="btn accent" id="saveBtn" onclick="saveSlot()">Book slot</button>
     </div>
   </div>
 </div>
@@ -412,66 +383,86 @@
 <div id="toast"></div>
 
 <script>
+// ── Constants ──────────────────────────────────────────
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-
-// Generate periods 7:00 AM to 5:30 PM in 1-hour slots
 const PERIODS = [];
 for (let h = 7; h <= 16; h++) {
-  const startH = h;
-  const endH = h + 1;
-  const startLabel = startH < 12 ? `${startH}:00 AM` : startH === 12 ? `12:00 PM` : `${startH-12}:00 PM`;
-  const endLabel = endH < 12 ? `${endH}:00 AM` : endH === 12 ? `12:00 PM` : `${endH-12}:00 PM`;
-  PERIODS.push(`${startLabel} – ${endLabel}`);
+  const s = h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h-12}:00 PM`;
+  const e = (h+1) < 12 ? `${h+1}:00 AM` : (h+1) === 12 ? '12:00 PM' : `${h+1-12}:00 PM`;
+  PERIODS.push(`${s} – ${e}`);
 }
-// Add 4:00 PM – 5:00 PM and 5:00 PM – 5:30 PM already captured; add the half-hour 5:00–5:30
-// Override last entry: 4:00 PM – 5:00 PM, then add 5:00 PM – 5:30 PM
 PERIODS.push('5:00 PM – 5:30 PM');
-// PERIODS now: 7:00 AM–8:00 AM ... 4:00 PM–5:00 PM, 5:00 PM–5:30 PM
 
 const COLORS = {
-  blue:   { bg: '#dbeafe', text: '#1e3a8a', border: '#3b82f6', swatch: '#3b82f6' },
-  teal:   { bg: '#ccfbf1', text: '#134e4a', border: '#14b8a6', swatch: '#14b8a6' },
-  purple: { bg: '#ede9fe', text: '#3b0764', border: '#8b5cf6', swatch: '#8b5cf6' },
-  amber:  { bg: '#fef3c7', text: '#78350f', border: '#f59e0b', swatch: '#f59e0b' },
-  coral:  { bg: '#fee2e2', text: '#7f1d1d', border: '#f87171', swatch: '#f87171' },
-  green:  { bg: '#dcfce7', text: '#14532d', border: '#22c55e', swatch: '#22c55e' },
-  rose:   { bg: '#fce7f3', text: '#831843', border: '#ec4899', swatch: '#ec4899' },
-  slate:  { bg: '#f1f5f9', text: '#1e293b', border: '#94a3b8', swatch: '#94a3b8' },
+  blue:   { bg:'#dbeafe', text:'#1e3a8a', border:'#3b82f6' },
+  teal:   { bg:'#ccfbf1', text:'#134e4a', border:'#14b8a6' },
+  purple: { bg:'#ede9fe', text:'#3b0764', border:'#8b5cf6' },
+  amber:  { bg:'#fef3c7', text:'#78350f', border:'#f59e0b' },
+  coral:  { bg:'#fee2e2', text:'#7f1d1d', border:'#f87171' },
+  green:  { bg:'#dcfce7', text:'#14532d', border:'#22c55e' },
+  rose:   { bg:'#fce7f3', text:'#831843', border:'#ec4899' },
+  slate:  { bg:'#f1f5f9', text:'#1e293b', border:'#94a3b8' },
 };
 
+const CFG_KEY = 'labsched_cfg';
+const LOCAL_SCHED_KEY = 'labsched_v2';
+
+// ── State ─────────────────────────────────────────────
+let supabase = null;
 let weekOffset = 0;
-let schedule = {};   // { weekKey: { cellId: { teacher, section, color } } }
+let schedule = {};   // cellId → booking object
 let pendingCell = null;
 let selectedColor = 'blue';
+let realtimeChannel = null;
 
-const STORAGE_KEY = 'labsched_v1';
-
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    schedule = raw ? JSON.parse(raw) : {};
-  } catch(e) { schedule = {}; }
+// ── Config ────────────────────────────────────────────
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); }
+  catch(e) { return null; }
 }
 
-function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(schedule)); }
-  catch(e) { toast('Storage full — old weeks cleared'); pruneOldWeeks(); }
+function saveConfig() {
+  const url = document.getElementById('cfgUrl').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('cfgKey').value.trim();
+  const errEl = document.getElementById('setupErr');
+  errEl.style.display = 'none';
+
+  if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
+    errEl.textContent = 'URL should look like: https://xxxxxxxxxxxx.supabase.co';
+    errEl.style.display = 'block'; return;
+  }
+  if (key.length < 100) {
+    errEl.textContent = 'The anon key looks too short. Copy it again from Project Settings → API.';
+    errEl.style.display = 'block'; return;
+  }
+
+  localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));
+  initApp({ url, key });
 }
 
-function pruneOldWeeks() {
-  const now = Date.now();
-  Object.keys(schedule).forEach(k => {
-    const d = new Date(k);
-    if (!isNaN(d) && (now - d.getTime()) > 60 * 24 * 3600 * 1000) delete schedule[k];
-  });
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(schedule)); } catch(e) {}
+function resetConfig() {
+  if (!confirm('Reset Supabase connection settings?')) return;
+  localStorage.removeItem(CFG_KEY);
+  location.reload();
 }
 
+// ── Supabase init ─────────────────────────────────────
+async function initApp(cfg) {
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+
+  supabase = window.supabase.createClient(cfg.url, cfg.key);
+
+  renderHeader();
+  await fetchSchedule();
+  subscribeRealtime();
+}
+
+// ── Data ──────────────────────────────────────────────
 function getWeekKey(offset) {
   const d = getMondayOfWeek(offset);
-  return d.toISOString().slice(0, 10);
+  return d.toISOString().slice(0,10);
 }
-
 function getMondayOfWeek(offset) {
   const d = new Date();
   const day = d.getDay() || 7;
@@ -479,48 +470,96 @@ function getMondayOfWeek(offset) {
   d.setHours(0,0,0,0);
   return d;
 }
-
 function getWeekDates(offset) {
   const mon = getMondayOfWeek(offset);
-  return DAYS.map((_, i) => {
-    const d = new Date(mon);
-    d.setDate(mon.getDate() + i);
-    return d;
-  });
+  return DAYS.map((_,i) => { const d = new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+function fmt(d) { return d.toLocaleDateString('en-PH', { month:'short', day:'numeric' }); }
+
+function showLoading(on) {
+  const bar = document.getElementById('loadingBar');
+  bar.style.display = on ? 'block' : 'none';
+  bar.style.transform = on ? 'scaleX(0.6)' : 'scaleX(1)';
+  if (!on) setTimeout(()=> bar.style.display='none', 300);
 }
 
-function fmt(d) {
-  return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+async function fetchSchedule() {
+  showLoading(true);
+  const wk = getWeekKey(weekOffset);
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('week_key', wk);
+
+  showLoading(false);
+  if (error) { toast('⚠ Could not load — check your Supabase URL/key'); console.error(error); return; }
+
+  schedule = {};
+  (data || []).forEach(row => { schedule[row.cell_id] = row; });
+  renderBody();
 }
 
-function currentWeekSlots() {
-  const k = getWeekKey(weekOffset);
-  if (!schedule[k]) schedule[k] = {};
-  return schedule[k];
+async function insertBooking(cellId, teacher, section, color) {
+  const wk = getWeekKey(weekOffset);
+  const { error } = await supabase.from('bookings').upsert({
+    week_key: wk, cell_id: cellId,
+    teacher, section, color
+  }, { onConflict: 'week_key,cell_id' });
+  if (error) { toast('⚠ Could not save booking'); console.error(error); return false; }
+  return true;
 }
 
+async function deleteBooking(cellId) {
+  const wk = getWeekKey(weekOffset);
+  const { error } = await supabase.from('bookings')
+    .delete()
+    .eq('week_key', wk)
+    .eq('cell_id', cellId);
+  if (error) { toast('⚠ Could not delete booking'); console.error(error); return false; }
+  return true;
+}
+
+// ── Realtime subscription ─────────────────────────────
+function subscribeRealtime() {
+  if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+
+  realtimeChannel = supabase
+    .channel('bookings-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
+      const wk = getWeekKey(weekOffset);
+      const row = payload.new || payload.old;
+      if (!row || row.week_key !== wk) return;
+
+      if (payload.eventType === 'DELETE') {
+        delete schedule[row.cell_id];
+      } else {
+        schedule[row.cell_id] = payload.new;
+      }
+      renderBody();
+    })
+    .subscribe();
+}
+
+// ── Render ────────────────────────────────────────────
 function renderHeader() {
   const dates = getWeekDates(weekOffset);
   document.getElementById('weekLabel').textContent =
     fmt(dates[0]) + ' – ' + fmt(dates[4]) + ', ' + dates[0].getFullYear();
 
-  let html = `<tr>
-    <th class="time-th">Time</th>`;
-  DAYS.forEach((d, i) => {
-    html += `<th class="day-th">${d}<span class="date-sub">${fmt(dates[i])}</span></th>`;
+  let html = '<tr><th class="time-th">Time</th>';
+  DAYS.forEach((d,i) => {
+    html += `<th>${d}<span class="date-sub">${fmt(dates[i])}</span></th>`;
   });
-  html += '</tr>';
-  document.getElementById('tableHead').innerHTML = html;
+  document.getElementById('tableHead').innerHTML = html + '</tr>';
 }
 
 function renderBody() {
-  const slots = currentWeekSlots();
   let html = '';
   PERIODS.forEach((p, pi) => {
     html += `<tr><td class="time-td">${p}</td>`;
     DAYS.forEach((_, di) => {
       const cid = `${pi}_${di}`;
-      const slot = slots[cid];
+      const slot = schedule[cid];
       if (slot) {
         const c = COLORS[slot.color] || COLORS.blue;
         html += `<td style="padding:3px;cursor:default">
@@ -531,8 +570,7 @@ function renderBody() {
             <span class="s-del" title="Remove">✕</span>
           </div></td>`;
       } else {
-        html += `<td class="empty-td" onclick="openModal(${pi},${di})"
-          title="Click to book: ${p}"></td>`;
+        html += `<td class="empty-td" onclick="openModal(${pi},${di})" title="${p}"></td>`;
       }
     });
     html += '</tr>';
@@ -542,32 +580,24 @@ function renderBody() {
 }
 
 function renderLegend() {
-  const slots = currentWeekSlots();
   const teachers = {};
-  Object.values(slots).forEach(s => {
-    if (s && !teachers[s.teacher]) teachers[s.teacher] = s.color;
-  });
+  Object.values(schedule).forEach(s => { if (s && !teachers[s.teacher]) teachers[s.teacher] = s.color; });
   const leg = document.getElementById('legend');
   if (!Object.keys(teachers).length) {
     leg.innerHTML = '<span style="font-size:12px;color:var(--text3)">No bookings yet this week</span>';
     return;
   }
-  leg.innerHTML = Object.entries(teachers).map(([t, c]) => {
+  leg.innerHTML = Object.entries(teachers).map(([t,c]) => {
     const col = COLORS[c] || COLORS.blue;
-    return `<div class="legend-item">
-      <div class="legend-dot" style="background:${col.border}"></div>
-      <span>${esc(t)}</span>
-    </div>`;
+    return `<div class="legend-item"><div class="legend-dot" style="background:${col.border}"></div><span>${esc(t)}</span></div>`;
   }).join('');
 }
 
-function buildColorGrid(selected) {
-  const grid = document.getElementById('colorGrid');
-  grid.innerHTML = Object.entries(COLORS).map(([k, v]) =>
-    `<div class="color-opt ${k === selected ? 'selected' : ''}"
-      style="background:${v.swatch}"
-      title="${k}"
-      onclick="selectColor('${k}')"></div>`
+// ── Modal ─────────────────────────────────────────────
+function buildColorGrid(sel) {
+  document.getElementById('colorGrid').innerHTML = Object.entries(COLORS).map(([k,v]) =>
+    `<div class="color-opt ${k===sel?'selected':''}" style="background:${v.border}"
+      title="${k}" onclick="selectColor('${k}')"></div>`
   ).join('');
 }
 
@@ -585,11 +615,9 @@ function openModal(pi, di) {
   const s = document.getElementById('sectionName').value.trim();
   const c = document.getElementById('colorPick').value;
   selectedColor = c;
-
   document.getElementById('mTeacher').value = t;
   document.getElementById('mSection').value = s;
-  document.getElementById('slotInfo').textContent =
-    `${PERIODS[pi]}  ·  ${DAYS[di]}, ${fmt(dates[di])}`;
+  document.getElementById('slotInfo').textContent = `${PERIODS[pi]}  ·  ${DAYS[di]}, ${fmt(dates[di])}`;
   buildColorGrid(c);
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(() => document.getElementById('mTeacher').focus(), 80);
@@ -600,61 +628,67 @@ function closeModal() {
   pendingCell = null;
 }
 
-function saveSlot() {
+async function saveSlot() {
   const teacher = document.getElementById('mTeacher').value.trim();
   const section = document.getElementById('mSection').value.trim();
   if (!teacher) { document.getElementById('mTeacher').focus(); return; }
+
+  document.getElementById('saveBtn').disabled = true;
   document.getElementById('teacherName').value = teacher;
   document.getElementById('sectionName').value = section;
   document.getElementById('colorPick').value = selectedColor;
 
-  currentWeekSlots()[pendingCell] = { teacher, section, color: selectedColor };
-  save();
-  closeModal();
-  renderBody();
-  toast('Slot booked!');
+  const ok = await insertBooking(pendingCell, teacher, section, selectedColor);
+  document.getElementById('saveBtn').disabled = false;
+  if (ok) { closeModal(); toast('Slot booked! 🟢'); }
 }
 
-function removeSlot(cid) {
+async function removeSlot(cid) {
+  const slot = schedule[cid];
+  const myName = document.getElementById('teacherName').value.trim();
+  if (slot && myName && slot.teacher !== myName) {
+    toast(`Only ${slot.teacher} can remove this slot.`); return;
+  }
   if (!confirm('Remove this booking?')) return;
-  delete currentWeekSlots()[cid];
-  save();
-  renderBody();
+  await deleteBooking(cid);
   toast('Booking removed.');
 }
 
-function clearMySlots() {
+async function clearMySlots() {
   const name = document.getElementById('teacherName').value.trim();
-  if (!name) { alert('Enter your name first so we know which slots to clear.'); return; }
+  if (!name) { alert('Enter your name first to clear only your slots.'); return; }
   if (!confirm(`Remove all slots booked by "${name}" this week?`)) return;
-  const slots = currentWeekSlots();
-  let count = 0;
-  Object.keys(slots).forEach(k => {
-    if (slots[k] && slots[k].teacher === name) { delete slots[k]; count++; }
-  });
-  save();
-  renderBody();
-  toast(count ? `Cleared ${count} slot${count > 1 ? 's' : ''}.` : 'No slots found for that name.');
+  const wk = getWeekKey(weekOffset);
+  const { error } = await supabase.from('bookings')
+    .delete()
+    .eq('week_key', wk)
+    .eq('teacher', name);
+  if (error) { toast('⚠ Error clearing slots'); return; }
+  toast('Your slots cleared.');
 }
 
-function changeWeek(dir) {
+// ── Navigation ─────────────────────────────────────────
+async function changeWeek(dir) {
   weekOffset += dir;
   renderHeader();
-  renderBody();
+  await fetchSchedule();
+  subscribeRealtime();
 }
 
-function goToday() {
+async function goToday() {
   weekOffset = 0;
   renderHeader();
-  renderBody();
+  await fetchSchedule();
+  subscribeRealtime();
 }
 
+// ── Helpers ────────────────────────────────────────────
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+  el._t = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
 function esc(s) {
@@ -663,7 +697,7 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// Close modal on overlay click or Escape
+// ── Modal events ───────────────────────────────────────
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
@@ -672,10 +706,15 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('modalOverlay').classList.contains('open')) saveSlot();
 });
 
-// Init
-load();
-renderHeader();
-renderBody();
+// ── Boot ───────────────────────────────────────────────
+(function boot() {
+  const cfg = loadConfig();
+  if (cfg && cfg.url && cfg.key) {
+    initApp(cfg);
+  } else {
+    document.getElementById('setupScreen').style.display = 'flex';
+  }
+})();
 </script>
 </body>
 </html>
