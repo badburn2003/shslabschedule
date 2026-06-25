@@ -288,6 +288,191 @@
     .controls { align-items:flex-start; }
   }
 
+
+  /* ── Mobile friendly layout ── */
+  .mobile-scroll-hint {
+    display: none;
+    font-size: 12px;
+    color: var(--text2);
+    padding: 8px 12px;
+    background: var(--accent-light);
+    border-bottom: 1px solid var(--border);
+  }
+
+  @media (max-width: 768px) {
+    body {
+      overflow-x: hidden;
+    }
+
+    .app-header {
+      padding: 0.75rem;
+      align-items: flex-start;
+    }
+
+    .app-header h1 {
+      font-size: 15px;
+      line-height: 1.35;
+      flex: 1 1 100%;
+    }
+
+    .app-header h1 span {
+      display: block;
+      border-left: none !important;
+      padding-left: 0 !important;
+      margin-left: 0 !important;
+      margin-top: 2px;
+      font-size: 11px !important;
+    }
+
+    .app-header .hright {
+      width: 100%;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .header-btn {
+      flex: 1;
+      min-width: 90px;
+    }
+
+    .controls {
+      padding: 0.75rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .controls label {
+      margin-top: 4px;
+    }
+
+    .controls input,
+    .controls select,
+    .controls .btn,
+    .time-editor input[type="time"],
+    .time-editor select {
+      width: 100%;
+      min-width: 0 !important;
+    }
+
+    .time-editor {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .time-editor label,
+    .time-editor span,
+    .time-editor button,
+    #autoSlotLabel {
+      grid-column: 1 / -1;
+    }
+
+    .sep {
+      display: none;
+    }
+
+    .week-nav {
+      padding: 0.75rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .week-label {
+      grid-column: 1 / -1;
+      order: -1;
+      min-width: 0;
+      width: 100%;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .week-nav .btn {
+      width: 100%;
+    }
+
+    .legend-bar {
+      padding: 0.6rem 0.75rem;
+    }
+
+    .mobile-scroll-hint {
+      display: block;
+    }
+
+    .grid-container {
+      padding: 0.5rem 0.5rem 2rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      min-width: 760px;
+      font-size: 11px;
+    }
+
+    th {
+      font-size: 11px;
+      padding: 8px 5px;
+    }
+
+    th.time-th {
+      width: 105px;
+      min-width: 105px;
+      position: sticky;
+      left: 0;
+      z-index: 5;
+    }
+
+    td {
+      height: 44px;
+      padding: 2px;
+    }
+
+    td.time-td {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      width: 105px;
+      min-width: 105px;
+      font-size: 10px;
+      background: var(--surface2);
+      box-shadow: 2px 0 0 var(--border2);
+    }
+
+    .slot {
+      padding: 4px 5px;
+    }
+
+    .slot .s-teacher {
+      font-size: 10px;
+    }
+
+    .slot .s-section {
+      font-size: 9px;
+    }
+
+    .modal {
+      width: 96vw;
+      padding: 1rem;
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .modal-actions .btn {
+      width: 100%;
+    }
+
+    .footer-credit {
+      font-size: 11px;
+      padding: 14px 8px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -360,6 +545,10 @@
   <div class="legend-bar">
     <span class="lbl">Teachers:</span>
     <div id="legend" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;"></div>
+  </div>
+
+  <div class="mobile-scroll-hint">
+    Tip: Swipe left or right to view all days on mobile.
   </div>
 
   <div class="grid-container">
