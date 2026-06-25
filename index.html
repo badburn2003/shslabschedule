@@ -81,7 +81,7 @@
   .btn.danger { color: #a32d2d; border-color: #e2a0a0; }
   .btn.danger:hover { background: #fff0f0; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .setup-err { font-size: 12px; color: #a32d2d; margin-top: 8px; display: none; }
+  .setup-err { font-size: 13px; color: #a32d2d; background: #fff0f0; border: 1px solid #e2a0a0; border-radius: 6px; padding: 10px 12px; margin-top: 10px; display: none; line-height: 1.5; }
 
   /* ── App ── */
   #appScreen { display: none; }
@@ -421,19 +421,49 @@ function loadConfig() {
   catch(e) { return null; }
 }
 
-function saveConfig() {
+async function saveConfig() {
   const url = document.getElementById('cfgUrl').value.trim().replace(/\/$/, '');
   const key = document.getElementById('cfgKey').value.trim();
   const errEl = document.getElementById('setupErr');
+  const btn = document.getElementById('connectBtn');
   errEl.style.display = 'none';
 
-  if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
-    errEl.textContent = 'URL should look like: https://xxxxxxxxxxxx.supabase.co';
+  if (!url.startsWith('https://')) {
+    errEl.textContent = '❌ URL must start with https://';
+    errEl.style.display = 'block'; return;
+  }
+  if (!url.includes('.supabase.co')) {
+    errEl.textContent = '❌ URL must end with .supabase.co — e.g. https://mstgsumlpzosfikpxbrp.supabase.co';
+    errEl.style.display = 'block'; return;
+  }
+  if (!key.startsWith('eyJ')) {
+    errEl.textContent = '❌ Anon key should start with "eyJ..." — make sure you copied the anon/public key from Settings → API.';
     errEl.style.display = 'block'; return;
   }
   if (key.length < 100) {
-    errEl.textContent = 'The anon key looks too short. Copy it again from Project Settings → API.';
+    errEl.textContent = '❌ Anon key looks too short (' + key.length + ' chars). Copy the full key again.';
     errEl.style.display = 'block'; return;
+  }
+
+  btn.textContent = 'Connecting...';
+  btn.disabled = true;
+
+  try {
+    const testClient = window.supabase.createClient(url, key);
+    const { error } = await testClient.from('bookings').select('id').limit(1);
+    if (error) {
+      errEl.textContent = '❌ Connected to Supabase but could not read the bookings table. Did you run both SQL blocks? Error: ' + error.message;
+      errEl.style.display = 'block';
+      btn.textContent = 'Connect & Open Scheduler →';
+      btn.disabled = false;
+      return;
+    }
+  } catch(e) {
+    errEl.textContent = '❌ Could not reach Supabase. Check your URL and try again. (' + e.message + ')';
+    errEl.style.display = 'block';
+    btn.textContent = 'Connect & Open Scheduler →';
+    btn.disabled = false;
+    return;
   }
 
   localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));
