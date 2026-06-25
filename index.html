@@ -248,6 +248,20 @@
     .app-header, .controls, .week-nav, .legend-bar { padding-left: 0.75rem; padding-right: 0.75rem; }
     .grid-container { padding: 0.75rem 0.5rem 3rem; }
   }
+
+  .footer-credit{
+    text-align:center;
+    padding:18px;
+    color:var(--text3);
+    font-size:12px;
+    border-top:1px solid var(--border);
+    background:var(--surface2);
+  }
+  .footer-credit strong{
+    color:var(--accent);
+    font-weight:600;
+  }
+
 </style>
 </head>
 <body>
@@ -267,6 +281,9 @@
     <h1>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
       Computer Lab Scheduler
+      <span style="font-size:12px;font-weight:400;opacity:.85;margin-left:10px;border-left:1px solid rgba(255,255,255,.35);padding-left:10px;">
+        Developed by <strong style="font-weight:600;">Lan Rey Kabigting</strong>
+      </span>
     </h1>
     <div class="hright">
       <span class="live-label"><span class="live-dot"></span>Live</span>
@@ -292,7 +309,21 @@
       <option value="slate">Slate</option>
     </select>
     <div class="sep"></div>
-    <button class="btn danger" onclick="clearMySlots()">✕ Clear my slots</button>
+    <label>Start:</label>
+    <input id="startTime" type="time" value="07:00" style="min-width:110px" />
+    <label>End:</label>
+    <input id="endTime" type="time" value="17:30" style="min-width:110px" />
+    <label>Interval:</label>
+    <select id="intervalPick">
+      <option value="30">30 min</option>
+      <option value="45">45 min</option>
+      <option value="60" selected>60 min</option>
+      <option value="90">90 min</option>
+    </select>
+    <button class="btn" onclick="applyTimeSettings()">Apply time</button>
+    <button class="btn" onclick="resetTimeSettings()">Reset time</button>
+    <div class="sep"></div>
+    <button class="btn danger" onclick="clearMySlots()" title="Admin/browser-only action">✕ Clear my slots</button>
   </div>
 
   <div class="week-nav">
@@ -313,9 +344,14 @@
       <tbody id="tableBody"></tbody>
     </table>
   </div>
+
+  <div class="footer-credit">
+    © 2026 <strong>Lan Rey Kabigting</strong>. All Rights Reserved.
+  </div>
 </div>
 
 <!-- Modal -->
+
 <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <div class="modal">
     <h2 id="modalTitle">Book this slot</h2>
@@ -344,13 +380,64 @@
 <script>
 // ── Constants ──────────────────────────────────────────
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-const PERIODS = [];
-for (let h = 7; h <= 16; h++) {
-  const s = h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h-12}:00 PM`;
-  const e = (h+1) < 12 ? `${h+1}:00 AM` : (h+1) === 12 ? '12:00 PM' : `${h+1-12}:00 PM`;
-  PERIODS.push(`${s} – ${e}`);
+let PERIODS = [];
+const TIME_CFG_KEY = 'labsched_time_cfg';
+
+function minutesToLabel(totalMinutes) {
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  let h12 = h24 % 12;
+  if (h12 === 0) h12 = 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
-PERIODS.push('5:00 PM – 5:30 PM');
+
+function timeToMinutes(value) {
+  const parts = (value || '').split(':').map(Number);
+  if (parts.length !== 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return null;
+  return parts[0] * 60 + parts[1];
+}
+
+function minutesToTimeInput(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function buildPeriods(start = '07:00', end = '17:30', interval = 60) {
+  const startMin = timeToMinutes(start);
+  const endMin = timeToMinutes(end);
+  const step = Number(interval) || 60;
+
+  if (startMin === null || endMin === null || endMin <= startMin || step < 15) {
+    PERIODS = ['7:00 AM – 8:00 AM'];
+    return;
+  }
+
+  PERIODS = [];
+  for (let t = startMin; t < endMin; t += step) {
+    const next = Math.min(t + step, endMin);
+    PERIODS.push(`${minutesToLabel(t)} – ${minutesToLabel(next)}`);
+  }
+}
+
+function loadTimeConfig() {
+  try {
+    return JSON.parse(localStorage.getItem(TIME_CFG_KEY) || 'null') || {
+      start: '07:00',
+      end: '17:30',
+      interval: 60
+    };
+  } catch(e) {
+    return { start: '07:00', end: '17:30', interval: 60 };
+  }
+}
+
+function saveTimeConfig(cfg) {
+  localStorage.setItem(TIME_CFG_KEY, JSON.stringify(cfg));
+}
+
+buildPeriods();
 
 const COLORS = {
   blue:   { bg:'#dbeafe', text:'#1e3a8a', border:'#3b82f6' },
@@ -425,8 +512,10 @@ async function saveConfig() {
     errEl.textContent = '❌ Could not reach Supabase. Check your URL and try again. (' + e.message + ')';
     errEl.style.display = 'block';
     if (btn) {
-      btn.textContent = 'Connect & Open Scheduler →';
-      btn.disabled = false;
+      if (btn) {
+        btn.textContent = 'Connect & Open Scheduler →';
+        btn.disabled = false;
+      }
     }
     return;
   }
@@ -448,6 +537,7 @@ async function initApp(cfg) {
 
   sbClient = window.supabase.createClient(cfg.url, cfg.key);
 
+  syncTimeControls();
   renderHeader();
   await fetchSchedule();
   subscribeRealtime();
@@ -559,10 +649,10 @@ function renderBody() {
         const c = COLORS[slot.color] || COLORS.blue;
         html += `<td style="padding:3px;cursor:default">
           <div class="slot" style="background:${c.bg};color:${c.text};border-left:3px solid ${c.border}"
-               onclick="removeSlot('${cid}')" title="Click to remove">
+               title="Booked slot — locked after submission">
             <span class="s-teacher">${esc(slot.teacher)}</span>
             <span class="s-section">${esc(slot.section)}</span>
-            <span class="s-del" title="Remove">✕</span>
+            <span class="s-del" title="Locked">🔒</span>
           </div></td>`;
       } else {
         html += `<td class="empty-td" onclick="openModal(${pi},${di})" title="${p}"></td>`;
@@ -639,27 +729,54 @@ async function saveSlot() {
 }
 
 async function removeSlot(cid) {
-  const slot = schedule[cid];
-  const myName = document.getElementById('teacherName').value.trim();
-  if (slot && myName && slot.teacher !== myName) {
-    toast(`Only ${slot.teacher} can remove this slot.`); return;
-  }
-  if (!confirm('Remove this booking?')) return;
-  await deleteBooking(cid);
-  toast('Booking removed.');
+  toast('This booking is locked after submission.');
 }
 
 async function clearMySlots() {
-  const name = document.getElementById('teacherName').value.trim();
-  if (!name) { alert('Enter your name first to clear only your slots.'); return; }
-  if (!confirm(`Remove all slots booked by "${name}" this week?`)) return;
-  const wk = getWeekKey(weekOffset);
-  const { error } = await sbClient.from('bookings')
-    .delete()
-    .eq('week_key', wk)
-    .eq('teacher', name);
-  if (error) { toast('⚠ Error clearing slots'); return; }
-  toast('Your slots cleared.');
+  alert('Deleting submitted bookings is disabled. Please contact the administrator if a booking needs to be corrected.');
+}
+
+// ── Time settings ──────────────────────────────────────
+function syncTimeControls() {
+  const cfg = loadTimeConfig();
+  const startEl = document.getElementById('startTime');
+  const endEl = document.getElementById('endTime');
+  const intervalEl = document.getElementById('intervalPick');
+
+  if (startEl) startEl.value = cfg.start;
+  if (endEl) endEl.value = cfg.end;
+  if (intervalEl) intervalEl.value = String(cfg.interval);
+
+  buildPeriods(cfg.start, cfg.end, cfg.interval);
+}
+
+async function applyTimeSettings() {
+  const start = document.getElementById('startTime').value;
+  const end = document.getElementById('endTime').value;
+  const interval = Number(document.getElementById('intervalPick').value);
+
+  const startMin = timeToMinutes(start);
+  const endMin = timeToMinutes(end);
+
+  if (startMin === null || endMin === null || endMin <= startMin) {
+    alert('Invalid time range. End time must be later than start time.');
+    return;
+  }
+
+  saveTimeConfig({ start, end, interval });
+  buildPeriods(start, end, interval);
+  renderHeader();
+  renderBody();
+  toast('Time settings updated.');
+}
+
+function resetTimeSettings() {
+  localStorage.removeItem(TIME_CFG_KEY);
+  buildPeriods();
+  syncTimeControls();
+  renderHeader();
+  renderBody();
+  toast('Time settings reset.');
 }
 
 // ── Navigation ─────────────────────────────────────────
