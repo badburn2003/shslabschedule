@@ -738,12 +738,10 @@ document.addEventListener('keydown', e => {
 
 // ── Boot ───────────────────────────────────────────────
 (function boot() {
-  const cfg = loadConfig();
-  if (cfg && cfg.url && cfg.key) {
-    initApp(cfg);
-  } else {
-    document.getElementById('setupScreen').style.display = 'flex';
-  }
+  const HARDCODED_URL = 'https://mstgsumlpzosfikpxbrp.supabase.co';
+  const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zdGdzdW1scHpvc2Zpa3B4YnJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNTIzMDAsImV4cCI6MjA5NzkyODMwMH0.-gwf0Q33rC6wmNEHBMwOeBiEINw4raYn2z2vVkayemM';
+  document.getElementById('setupScreen').style.display = 'none';
+  initApp({ url: HARDCODED_URL, key: HARDCODED_KEY });
 })();
 </script>
 </body>
