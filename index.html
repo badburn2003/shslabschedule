@@ -262,6 +262,32 @@
     font-weight:600;
   }
 
+
+  .time-editor {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:0.5rem;
+  }
+  .time-editor input[type="time"],
+  .time-editor select {
+    min-width:105px;
+  }
+  .slot.locked {
+    cursor: default;
+  }
+  .slot .s-lock {
+    position:absolute;
+    top:2px;
+    right:4px;
+    font-size:10px;
+    opacity:.65;
+  }
+  @media (max-width: 900px) {
+    .app-header h1 span { display:block; margin-left:0 !important; padding-left:0 !important; border-left:none !important; margin-top:2px; }
+    .controls { align-items:flex-start; }
+  }
+
 </style>
 </head>
 <body>
@@ -309,21 +335,19 @@
       <option value="slate">Slate</option>
     </select>
     <div class="sep"></div>
-    <label>Start:</label>
-    <input id="startTime" type="time" value="07:00" style="min-width:110px" />
-    <label>End:</label>
-    <input id="endTime" type="time" value="17:30" style="min-width:110px" />
-    <label>Interval:</label>
-    <select id="intervalPick">
-      <option value="30">30 min</option>
-      <option value="45">45 min</option>
-      <option value="60" selected>60 min</option>
-      <option value="90">90 min</option>
-    </select>
-    <button class="btn" onclick="applyTimeSettings()">Apply time</button>
-    <button class="btn" onclick="resetTimeSettings()">Reset time</button>
+    <div class="time-editor">
+      <label>First slot:</label>
+      <input id="startTime" type="time" value="07:00" step="300" title="First slot start time" />
+      <span>to</span>
+      <input id="firstSlotEndTime" type="time" value="08:00" step="300" title="First slot end time" />
+      <label>Day end:</label>
+      <input id="endTime" type="time" value="17:30" step="300" title="Last possible end time" />
+      <span id="autoSlotLabel" style="font-size:12px;color:var(--text2);min-width:110px;">Auto: 60 min</span>
+      <button class="btn accent" onclick="applyTimeSettings()">Apply time</button>
+      <button class="btn" onclick="resetTimeSettings()">Reset</button>
+    </div>
     <div class="sep"></div>
-    <button class="btn danger" onclick="clearMySlots()" title="Admin/browser-only action">✕ Clear my slots</button>
+    <button class="btn danger" onclick="clearMySlots()" title="Deleting submitted bookings is disabled">Locked after submit</button>
   </div>
 
   <div class="week-nav">
@@ -393,9 +417,12 @@ function minutesToLabel(totalMinutes) {
 }
 
 function timeToMinutes(value) {
-  const parts = (value || '').split(':').map(Number);
-  if (parts.length !== 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return null;
-  return parts[0] * 60 + parts[1];
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
 }
 
 function minutesToTimeInput(totalMinutes) {
@@ -404,32 +431,40 @@ function minutesToTimeInput(totalMinutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function buildPeriods(start = '07:00', end = '17:30', interval = 60) {
+function buildPeriods(start = '07:00', firstEnd = '08:00', dayEnd = '17:30') {
   const startMin = timeToMinutes(start);
-  const endMin = timeToMinutes(end);
-  const step = Number(interval) || 60;
+  const firstEndMin = timeToMinutes(firstEnd);
+  const dayEndMin = timeToMinutes(dayEnd);
 
-  if (startMin === null || endMin === null || endMin <= startMin || step < 15) {
-    PERIODS = ['7:00 AM – 8:00 AM'];
-    return;
+  if (startMin === null || firstEndMin === null || dayEndMin === null || firstEndMin <= startMin || dayEndMin <= startMin) {
+    PERIODS = [{ label: '7:00 AM – 8:00 AM', start: 420, end: 480 }];
+    return 60;
   }
 
+  const slotLength = firstEndMin - startMin;
   PERIODS = [];
-  for (let t = startMin; t < endMin; t += step) {
-    const next = Math.min(t + step, endMin);
-    PERIODS.push(`${minutesToLabel(t)} – ${minutesToLabel(next)}`);
+
+  for (let t = startMin; t < dayEndMin; t += slotLength) {
+    const next = Math.min(t + slotLength, dayEndMin);
+    PERIODS.push({
+      label: `${minutesToLabel(t)} – ${minutesToLabel(next)}`,
+      start: t,
+      end: next
+    });
   }
+
+  return slotLength;
 }
 
 function loadTimeConfig() {
   try {
     return JSON.parse(localStorage.getItem(TIME_CFG_KEY) || 'null') || {
       start: '07:00',
-      end: '17:30',
-      interval: 60
+      firstEnd: '08:00',
+      end: '17:30'
     };
   } catch(e) {
-    return { start: '07:00', end: '17:30', interval: 60 };
+    return { start: '07:00', firstEnd: '08:00', end: '17:30' };
   }
 }
 
@@ -537,6 +572,8 @@ async function initApp(cfg) {
 
   sbClient = window.supabase.createClient(cfg.url, cfg.key);
 
+  
+  
   syncTimeControls();
   renderHeader();
   await fetchSchedule();
@@ -585,6 +622,9 @@ async function fetchSchedule() {
 }
 
 async function insertBooking(cellId, teacher, section, color) {
+  const blocked = await hasOverlap(cellId);
+  if (blocked) return false;
+
   const wk = getWeekKey(weekOffset);
   const { error } = await sbClient.from('bookings').upsert({
     week_key: wk, cell_id: cellId,
@@ -640,19 +680,19 @@ function renderHeader() {
 
 function renderBody() {
   let html = '';
-  PERIODS.forEach((p, pi) => {
+  PERIODS.forEach((slotObj, pi) => {
+    const p = slotObj.label || String(slotObj);
     html += `<tr><td class="time-td">${p}</td>`;
     DAYS.forEach((_, di) => {
-      const cid = `${pi}_${di}`;
+      const cid = cellIdForSlot(di, slotObj);
       const slot = schedule[cid];
       if (slot) {
         const c = COLORS[slot.color] || COLORS.blue;
         html += `<td style="padding:3px;cursor:default">
-          <div class="slot" style="background:${c.bg};color:${c.text};border-left:3px solid ${c.border}"
-               title="Booked slot — locked after submission">
+          <div class="slot locked" style="background:${c.bg};color:${c.text};border-left:3px solid ${c.border}" title="Booked slot — locked after submission">
             <span class="s-teacher">${esc(slot.teacher)}</span>
             <span class="s-section">${esc(slot.section)}</span>
-            <span class="s-del" title="Locked">🔒</span>
+            <span class="s-lock" title="Locked">🔒</span>
           </div></td>`;
       } else {
         html += `<td class="empty-td" onclick="openModal(${pi},${di})" title="${p}"></td>`;
@@ -694,7 +734,8 @@ function selectColor(c) {
 }
 
 function openModal(pi, di) {
-  pendingCell = `${pi}_${di}`;
+  const slotObj = PERIODS[pi];
+  pendingCell = cellIdForSlot(di, slotObj);
   const dates = getWeekDates(weekOffset);
   const t = document.getElementById('teacherName').value.trim();
   const s = document.getElementById('sectionName').value.trim();
@@ -702,7 +743,7 @@ function openModal(pi, di) {
   selectedColor = c;
   document.getElementById('mTeacher').value = t;
   document.getElementById('mSection').value = s;
-  document.getElementById('slotInfo').textContent = `${PERIODS[pi]}  ·  ${DAYS[di]}, ${fmt(dates[di])}`;
+  document.getElementById('slotInfo').textContent = `${slotObj.label}  ·  ${DAYS[di]}, ${fmt(dates[di])}`;
   buildColorGrid(c);
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(() => document.getElementById('mTeacher').focus(), 80);
@@ -739,44 +780,101 @@ async function clearMySlots() {
 // ── Time settings ──────────────────────────────────────
 function syncTimeControls() {
   const cfg = loadTimeConfig();
+
   const startEl = document.getElementById('startTime');
+  const firstEndEl = document.getElementById('firstSlotEndTime');
   const endEl = document.getElementById('endTime');
-  const intervalEl = document.getElementById('intervalPick');
 
   if (startEl) startEl.value = cfg.start;
+  if (firstEndEl) firstEndEl.value = cfg.firstEnd || minutesToTimeInput(timeToMinutes(cfg.start || '07:00') + Number(cfg.interval || 60) * 1);
   if (endEl) endEl.value = cfg.end;
-  if (intervalEl) intervalEl.value = String(cfg.interval);
 
-  buildPeriods(cfg.start, cfg.end, cfg.interval);
+  const slotLength = buildPeriods(cfg.start, cfg.firstEnd || firstEndEl?.value || '08:00', cfg.end);
+  const label = document.getElementById('autoSlotLabel');
+  if (label) label.textContent = `Auto: ${slotLength} min`;
 }
 
 async function applyTimeSettings() {
   const start = document.getElementById('startTime').value;
+  const firstEnd = document.getElementById('firstSlotEndTime').value;
   const end = document.getElementById('endTime').value;
-  const interval = Number(document.getElementById('intervalPick').value);
 
   const startMin = timeToMinutes(start);
+  const firstEndMin = timeToMinutes(firstEnd);
   const endMin = timeToMinutes(end);
 
-  if (startMin === null || endMin === null || endMin <= startMin) {
-    alert('Invalid time range. End time must be later than start time.');
+  if (startMin === null || firstEndMin === null || endMin === null || firstEndMin <= startMin || endMin <= startMin) {
+    alert('Invalid time range. First slot end must be later than start, and day end must be later than start.');
     return;
   }
 
-  saveTimeConfig({ start, end, interval });
-  buildPeriods(start, end, interval);
+  const slotLength = firstEndMin - startMin;
+  saveTimeConfig({ start, firstEnd, end });
+  buildPeriods(start, firstEnd, end);
+
+  const label = document.getElementById('autoSlotLabel');
+  if (label) label.textContent = `Auto: ${slotLength} min`;
+
   renderHeader();
-  renderBody();
-  toast('Time settings updated.');
+  await fetchSchedule();
+  toast(`Time updated. Slot length: ${slotLength} min`);
 }
 
-function resetTimeSettings() {
+async function resetTimeSettings() {
   localStorage.removeItem(TIME_CFG_KEY);
-  buildPeriods();
   syncTimeControls();
   renderHeader();
-  renderBody();
+  await fetchSchedule();
   toast('Time settings reset.');
+}
+
+function cellIdForSlot(dayIndex, slotObj) {
+  return `${dayIndex}_${slotObj.start}_${slotObj.end}`;
+}
+
+function parseCellId(cellId) {
+  const m = String(cellId || '').match(/^(\d+)_(\d+)_(\d+)$/);
+  if (!m) return null;
+  return {
+    day: Number(m[1]),
+    start: Number(m[2]),
+    end: Number(m[3])
+  };
+}
+
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+async function hasOverlap(cellId) {
+  const target = parseCellId(cellId);
+  if (!target) return false;
+
+  const wk = getWeekKey(weekOffset);
+  const { data, error } = await sbClient
+    .from('bookings')
+    .select('cell_id, teacher, section')
+    .eq('week_key', wk);
+
+  if (error) {
+    console.error(error);
+    toast('⚠ Could not verify overlaps. Please try again.');
+    return true;
+  }
+
+  for (const row of data || []) {
+    if (row.cell_id === cellId) return true;
+    const existing = parseCellId(row.cell_id);
+    if (!existing) continue;
+    if (existing.day !== target.day) continue;
+
+    if (rangesOverlap(target.start, target.end, existing.start, existing.end)) {
+      toast(`⚠ Time conflict with ${row.teacher || 'another teacher'} (${minutesToLabel(existing.start)} – ${minutesToLabel(existing.end)}).`);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // ── Navigation ─────────────────────────────────────────
