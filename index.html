@@ -367,7 +367,7 @@ const CFG_KEY = 'labsched_cfg';
 const LOCAL_SCHED_KEY = 'labsched_v2';
 
 // ── State ─────────────────────────────────────────────
-let supabase = null;
+let sbClient = null;
 let weekOffset = 0;
 let schedule = {};   // cellId → booking object
 let pendingCell = null;
@@ -404,8 +404,10 @@ async function saveConfig() {
     errEl.style.display = 'block'; return;
   }
 
-  btn.textContent = 'Connecting...';
-  btn.disabled = true;
+  if (btn) {
+    btn.textContent = 'Connecting...';
+    btn.disabled = true;
+  }
 
   try {
     const testClient = window.supabase.createClient(url, key);
@@ -413,15 +415,19 @@ async function saveConfig() {
     if (error) {
       errEl.textContent = '❌ Connected to Supabase but could not read the bookings table. Did you run both SQL blocks? Error: ' + error.message;
       errEl.style.display = 'block';
-      btn.textContent = 'Connect & Open Scheduler →';
-      btn.disabled = false;
+      if (btn) {
+        btn.textContent = 'Connect & Open Scheduler →';
+        btn.disabled = false;
+      }
       return;
     }
   } catch(e) {
     errEl.textContent = '❌ Could not reach Supabase. Check your URL and try again. (' + e.message + ')';
     errEl.style.display = 'block';
-    btn.textContent = 'Connect & Open Scheduler →';
-    btn.disabled = false;
+    if (btn) {
+      btn.textContent = 'Connect & Open Scheduler →';
+      btn.disabled = false;
+    }
     return;
   }
 
@@ -440,7 +446,7 @@ async function initApp(cfg) {
   document.getElementById('setupScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
 
-  supabase = window.supabase.createClient(cfg.url, cfg.key);
+  sbClient = window.supabase.createClient(cfg.url, cfg.key);
 
   renderHeader();
   await fetchSchedule();
@@ -475,7 +481,7 @@ function showLoading(on) {
 async function fetchSchedule() {
   showLoading(true);
   const wk = getWeekKey(weekOffset);
-  const { data, error } = await supabase
+  const { data, error } = await sbClient
     .from('bookings')
     .select('*')
     .eq('week_key', wk);
@@ -490,7 +496,7 @@ async function fetchSchedule() {
 
 async function insertBooking(cellId, teacher, section, color) {
   const wk = getWeekKey(weekOffset);
-  const { error } = await supabase.from('bookings').upsert({
+  const { error } = await sbClient.from('bookings').upsert({
     week_key: wk, cell_id: cellId,
     teacher, section, color
   }, { onConflict: 'week_key,cell_id' });
@@ -500,7 +506,7 @@ async function insertBooking(cellId, teacher, section, color) {
 
 async function deleteBooking(cellId) {
   const wk = getWeekKey(weekOffset);
-  const { error } = await supabase.from('bookings')
+  const { error } = await sbClient.from('bookings')
     .delete()
     .eq('week_key', wk)
     .eq('cell_id', cellId);
@@ -510,9 +516,9 @@ async function deleteBooking(cellId) {
 
 // ── Realtime subscription ─────────────────────────────
 function subscribeRealtime() {
-  if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+  if (realtimeChannel) sbClient.removeChannel(realtimeChannel);
 
-  realtimeChannel = supabase
+  realtimeChannel = sbClient
     .channel('bookings-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
       const wk = getWeekKey(weekOffset);
@@ -648,7 +654,7 @@ async function clearMySlots() {
   if (!name) { alert('Enter your name first to clear only your slots.'); return; }
   if (!confirm(`Remove all slots booked by "${name}" this week?`)) return;
   const wk = getWeekKey(weekOffset);
-  const { error } = await supabase.from('bookings')
+  const { error } = await sbClient.from('bookings')
     .delete()
     .eq('week_key', wk)
     .eq('teacher', name);
